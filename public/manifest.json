@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "TS Chrome Extension",
+  "version": "0.1.0",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "permissions": ["activeTab", "scripting", "storage"]
+}
