@@ -1,6 +1,7 @@
 import { initManufacturers } from "./manufacturer.js";
+import { initPackages } from "./package.js";
 import { initProducts } from "./product.js";
-import { bindStatusElement, setStatus } from "./status.js";
+import { bindStatusElement } from "./status.js";
 
 export {};
 
@@ -25,7 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
   panels = Array.from(document.querySelectorAll<HTMLElement>(".tab-panel"));
 
   initManufacturers();
-  initProducts(setStatus);
+  initProducts();
+  initPackages();
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {

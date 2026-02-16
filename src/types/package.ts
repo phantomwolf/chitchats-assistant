@@ -4,7 +4,8 @@ import { WeightUnit } from "./weight-unit.js";
 
 export interface Package {
     type: PackageType;
-    weight: number;
+    fromWeight: number;
+    toWeight: number;
     weightUnit: WeightUnit;
     length: number;
     width: number;
