@@ -46,18 +46,6 @@ function validateManufacturer(mfr: Manufacturer): boolean {
 }
 
 function readInputs(elements: ManufacturerHtmlElements): Manufacturer | null {
-  /*const mfr: Manufacturer = {
-    contact: elements.contact?.value.trim() || '',
-    address1: elements.address1?.value.trim() || '',
-    address2: elements.address2?.value.trim() || '',
-    city: elements.city?.value.trim() || '',
-    postalCode: elements.postalCode?.value.trim() || '',
-    provinceState: elements.provinceState?.value.trim() || '',
-    country: elements.country?.value.trim() || '',
-    phone: elements.phone?.value.trim() || '',
-    email: elements.email?.value.trim() || '',
-    isDefault: false
-  };*/
   const mfr = {
     isDefault: false,
   } as Manufacturer;
@@ -91,10 +79,7 @@ function formatSummary(mfr: Manufacturer, index: number) {
   return mfr.isDefault ? `${summary} (Default)` : summary;
 }
 
-function buildEditPanel(
-  item: Manufacturer,
-  key: string,
-) {
+function buildEditPanel(item: Manufacturer) {
   const panel = document.createElement("div");
   panel.className = "edit-panel";
 
@@ -109,6 +94,7 @@ function buildEditPanel(
     phone: createInput("Phone (Optional)", "text", item.phone || ""),
     email: createInput("Email (Optional)", "email", item.email || "")
   };
+  inputs.contact.input.disabled = true;
 
   panel.appendChild(inputs.contact.wrapper);
   panel.appendChild(createRow([inputs.address1.wrapper, inputs.address2.wrapper]));
@@ -222,7 +208,7 @@ function renderManufacturers(mfrs: Manufacturer[]) {
     summaryRow.appendChild(summary);
     summaryRow.appendChild(actions);
 
-    const panel = buildEditPanel(mfr, mfr.contact);
+    const panel = buildEditPanel(mfr);
     panel.classList.add("hidden");
 
     editButton.addEventListener("click", () => {
@@ -238,7 +224,7 @@ function renderManufacturers(mfrs: Manufacturer[]) {
 
 async function loadManufacturers() {
   const storage = await getStorage();
-  renderManufacturers(storage.getManufacturerList());
+  renderManufacturers(storage.getSortedManufacturerList());
 }
 
 async function addManufacturer() {
@@ -258,7 +244,7 @@ async function addManufacturer() {
     return;
   }
 
-  renderManufacturers(storage.getManufacturerList());
+  renderManufacturers(storage.getSortedManufacturerList());
   clearInputs(inputElements);
   toggleAddForm(false);
   setStatus(`Manufacturer ${newMfr.contact} created.`, false);
@@ -275,7 +261,7 @@ async function removeManufacturer(contact: string) {
     return;
   }
 
-  renderManufacturers(storage.getManufacturerList());
+  renderManufacturers(storage.getSortedManufacturerList());
   setStatus(`Manufacturer ${contact} removed.`, false);
 }
 
@@ -290,7 +276,7 @@ async function updateManufacturer(updated: Manufacturer) {
     return;
   }
 
-  renderManufacturers(storage.getManufacturerList());
+  renderManufacturers(storage.getSortedManufacturerList());
   setStatus(`Manufacturer ${updated.contact} saved.`, false);
 }
 
@@ -305,7 +291,7 @@ async function setDefaultManufacturer(contact: string) {
     return;
   }
 
-  renderManufacturers(storage.getManufacturerList());
+  renderManufacturers(storage.getSortedManufacturerList());
   setStatus(`Manufacturer ${contact} is successfully set as default.`, false);
 }
 

@@ -1,59 +1,59 @@
+import { getStorage } from "../storage.js";
 import { Product, WeightUnit } from "../types/index.js";
+import { setStatus } from "./status.js";
 
-let addInputs = {
-  name: null as HTMLInputElement | null,
-  description: null as HTMLInputElement | null,
-  weight: null as HTMLInputElement | null,
-  weightUnit: null as HTMLSelectElement | null,
-  originCountry: null as HTMLInputElement | null,
-  hsCode: null as HTMLInputElement | null,
-  steel: null as HTMLInputElement | null,
-  aluminum: null as HTMLInputElement | null
-};
+const prdRequiredKeys = ['name', 'description', 'weight', 'weightUnit', 'originCountry', 'hsCode'] as const;
+const prdOptionalKeys = ['steel', 'aluminum'] as const;
 
-let productList: HTMLUListElement | null = null;
-let addProductLink: HTMLButtonElement | null = null;
-let addProductForm: HTMLDivElement | null = null;
-let addProductButton: HTMLButtonElement | null = null;
-let cancelAddProductButton: HTMLButtonElement | null = null;
-
-function bindElements() {
-  addInputs = {
-    name: document.getElementById("p-name") as HTMLInputElement | null,
-    description: document.getElementById("p-description") as HTMLInputElement | null,
-    weight: document.getElementById("p-weight") as HTMLInputElement | null,
-    weightUnit: document.getElementById("p-weight-unit") as HTMLSelectElement | null,
-    originCountry: document.getElementById("p-origin-country") as HTMLInputElement | null,
-    hsCode: document.getElementById("p-hs-code") as HTMLInputElement | null,
-    steel: document.getElementById("p-steel") as HTMLInputElement | null,
-    aluminum: document.getElementById("p-aluminum") as HTMLInputElement | null
-  };
-
-  productList = document.getElementById("product-list") as HTMLUListElement | null;
-  addProductLink = document.getElementById("add-product-link") as HTMLButtonElement | null;
-  addProductForm = document.getElementById("add-product-form") as HTMLDivElement | null;
-  addProductButton = document.getElementById("add-product") as HTMLButtonElement | null;
-  cancelAddProductButton = document.getElementById("cancel-add-product") as HTMLButtonElement | null;
+interface ProductHtmlElements {
+  name: HTMLInputElement | null,
+  nameIsRegex: HTMLInputElement | null,
+  description: HTMLInputElement | null,
+  weight: HTMLInputElement | null,
+  weightUnit: HTMLSelectElement | null,
+  originCountry: HTMLInputElement | null,
+  hsCode: HTMLInputElement | null,
+  steel: HTMLInputElement | null,
+  aluminum: HTMLInputElement | null,
 }
 
-const defaultProduct: Product = {
-  name: "",
-  description: "",
-  weight: 0,
-  weightUnit: WeightUnit.G,
-  originCountry: "",
-  hsCode: "",
-  steel: 0,
-  aluminum: 0
+const inputElements: ProductHtmlElements = {
+  name: document.getElementById("p-name") as HTMLInputElement | null,
+  nameIsRegex: document.getElementById("p-name-is-regex") as HTMLInputElement | null,
+  description: document.getElementById("p-description") as HTMLInputElement | null,
+  weight: document.getElementById("p-weight") as HTMLInputElement | null,
+  weightUnit: document.getElementById("p-weight-unit") as HTMLSelectElement | null,
+  originCountry: document.getElementById("p-origin-country") as HTMLInputElement | null,
+  hsCode: document.getElementById("p-hs-code") as HTMLInputElement | null,
+  steel: document.getElementById("p-steel") as HTMLInputElement | null,
+  aluminum: document.getElementById("p-aluminum") as HTMLInputElement | null
 };
 
-function readInputs(source: typeof addInputs): Product {
-  const weight = Number(source.weight?.value || 0);
-  const steel = Number(source.steel?.value || 0);
-  const aluminum = Number(source.aluminum?.value || 0);
+const productList = document.getElementById("product-list") as HTMLUListElement | null;
+const defaultProductEnabledSwitch = document.getElementById("p-default-product-enabled") as HTMLInputElement | null;
+const addProductLink = document.getElementById("add-product-link") as HTMLButtonElement | null;
+const addProductForm = document.getElementById("add-product-form") as HTMLDivElement | null;
+const addProductButton = document.getElementById("add-product") as HTMLButtonElement | null;
+const cancelAddProductButton = document.getElementById("cancel-add-product") as HTMLButtonElement | null;
 
-  return {
+function validateProduct(product: Product): boolean {
+  // Check required fields
+  for (let key of prdRequiredKeys) {
+    if (!product[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function readInputs(source: ProductHtmlElements): Product | null {
+  const weight = Number(source.weight?.value.trim() || "0");
+  const steel = Number(source.steel?.value.trim() || "0");
+  const aluminum = Number(source.aluminum?.value.trim() || "0");
+
+  const product: Product = {
     name: source.name?.value.trim() || "",
+    nameIsRegex: source.nameIsRegex?.checked || false,
     description: source.description?.value.trim() || "",
     weight: Number.isFinite(weight) ? weight : 0,
     weightUnit: (source.weightUnit?.value || WeightUnit.G) as WeightUnit,
@@ -62,21 +62,23 @@ function readInputs(source: typeof addInputs): Product {
     steel: Number.isFinite(steel) ? steel : 0,
     aluminum: Number.isFinite(aluminum) ? aluminum : 0
   };
+
+  if (!validateProduct(product)) {
+    return null;
+  }
+  return product;
 }
 
-function writeInputs(target: typeof addInputs, info: Product) {
-  if (target.name) target.name.value = info.name;
-  if (target.description) target.description.value = info.description;
-  if (target.weight) target.weight.value = String(info.weight ?? "");
-  if (target.weightUnit) target.weightUnit.value = info.weightUnit;
-  if (target.originCountry) target.originCountry.value = info.originCountry;
-  if (target.hsCode) target.hsCode.value = info.hsCode;
-  if (target.steel) target.steel.value = String(info.steel ?? "");
-  if (target.aluminum) target.aluminum.value = String(info.aluminum ?? "");
-}
-
-function clearInputs(target: typeof addInputs) {
-  writeInputs(target, defaultProduct);
+function clearInputs(elements: ProductHtmlElements) {
+  elements.name!.value = "";
+  elements.nameIsRegex!.checked = false;
+  elements.description!.value = "";
+  elements.weight!.value = "";
+  elements.weightUnit!.value = WeightUnit.G;
+  elements.originCountry!.value = "";
+  elements.hsCode!.value = "";
+  elements.steel!.value = "";
+  elements.aluminum!.value = "";
 }
 
 function formatSummary(item: Product, index: number) {
@@ -89,12 +91,13 @@ function formatSummary(item: Product, index: number) {
   return parts.join(", ");
 }
 
-function buildEditPanel(item: Product, key: string, setStatus: (message: string, isError?: boolean) => void) {
+function buildEditPanel(item: Product) {
   const panel = document.createElement("div");
   panel.className = "edit-panel";
 
   const inputs = {
     name: createInput("Name", "text", item.name),
+    nameIsRegex: createCheckbox("nameIsRegex", item.nameIsRegex),
     description: createInput("Description", "text", item.description),
     weight: createInput("Weight", "number", String(item.weight ?? "")),
     weightUnit: createSelect("Weight Unit", [WeightUnit.G, WeightUnit.KG, WeightUnit.LB, WeightUnit.OZ], item.weightUnit),
@@ -103,8 +106,9 @@ function buildEditPanel(item: Product, key: string, setStatus: (message: string,
     steel: createInput("Steel", "number", String(item.steel ?? "")),
     aluminum: createInput("Aluminum", "number", String(item.aluminum ?? ""))
   };
+  inputs.name.input.disabled = true;
 
-  panel.appendChild(inputs.name.wrapper);
+  panel.appendChild(createRow([inputs.name.wrapper, inputs.nameIsRegex.wrapper]));
   panel.appendChild(inputs.description.wrapper);
   panel.appendChild(createRow([inputs.weight.wrapper, inputs.weightUnit.wrapper]));
   panel.appendChild(createRow([inputs.originCountry.wrapper, inputs.hsCode.wrapper]));
@@ -118,6 +122,7 @@ function buildEditPanel(item: Product, key: string, setStatus: (message: string,
   saveButton.addEventListener("click", () => {
     const updated: Product = {
       name: inputs.name.input.value.trim(),
+      nameIsRegex: inputs.nameIsRegex.input.checked,
       description: inputs.description.input.value.trim(),
       weight: Number(inputs.weight.input.value || 0),
       weightUnit: inputs.weightUnit.select.value as WeightUnit,
@@ -130,7 +135,7 @@ function buildEditPanel(item: Product, key: string, setStatus: (message: string,
       setStatus("Name is required.", true);
       return;
     }
-    updateProduct(key, updated, setStatus).catch((err) => setStatus(`Error: ${String(err)}`, true));
+    updateProduct(updated).catch((err) => setStatus(`Error: ${String(err)}`, true));
   });
 
   const cancelButton = document.createElement("button");
@@ -190,39 +195,37 @@ function createSelect(labelText: string, options: string[], value: string) {
   return { wrapper, select };
 }
 
-function normalizeProducts(items: Product[]) {
-  return items.map((item) => ({
-    ...defaultProduct,
-    ...item
-  }));
+function createCheckbox(labelText: string, checked: boolean) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "field";
+
+  const label = document.createElement("label");
+  label.textContent = labelText;
+  wrapper.appendChild(label);
+
+  const switchLabel = document.createElement("label");
+  switchLabel.className = "switch";
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = checked;
+  switchLabel.appendChild(input);
+
+  const slider = document.createElement("span");
+  slider.className = "switch-slider";
+  switchLabel.appendChild(slider);
+
+  wrapper.appendChild(switchLabel);
+
+  return { wrapper, input };
 }
 
-function itemsToEntries(items: Product[]) {
-  return items
-    .slice()
-    .map((item) => ({
-      key: item.name,
-      item
-    }));
-}
-
-function toMap(items: Product[]) {
-  const map: Record<string, Product> = {};
-  items.forEach((item) => {
-    map[item.name] = item;
-  });
-  return map;
-}
-
-function renderProducts(items: Product[], setStatus: (message: string, isError?: boolean) => void) {
+function renderProducts(items: Product[]) {
   const list = productList;
   if (!list) return;
   list.innerHTML = "";
 
-  const entries = itemsToEntries(items);
-
-  entries.forEach((entry, index) => {
-    const item = entry.item;
+  items.forEach((item, index) => {
     const li = document.createElement("li");
 
     const summaryRow = document.createElement("div");
@@ -241,7 +244,7 @@ function renderProducts(items: Product[], setStatus: (message: string, isError?:
     const deleteButton = document.createElement("button");
     deleteButton.textContent = "Delete";
     deleteButton.addEventListener("click", () => {
-      removeProduct(entry.key, setStatus).catch((err) => setStatus(`Error: ${String(err)}`, true));
+      removeProduct(item.name).catch((err) => setStatus(`Error: ${String(err)}`, true));
     });
 
     actions.appendChild(editButton);
@@ -249,7 +252,7 @@ function renderProducts(items: Product[], setStatus: (message: string, isError?:
     summaryRow.appendChild(summary);
     summaryRow.appendChild(actions);
 
-    const panel = buildEditPanel(item, entry.key, setStatus);
+    const panel = buildEditPanel(item);
     panel.classList.add("hidden");
 
     editButton.addEventListener("click", () => {
@@ -263,59 +266,81 @@ function renderProducts(items: Product[], setStatus: (message: string, isError?:
   });
 }
 
-async function loadProducts(setStatus: (message: string, isError?: boolean) => void) {
-  const result = await chrome.storage.sync.get({ products: {} });
-  const products = normalizeProducts(Object.values(result.products as Record<string, Product>));
-  await chrome.storage.sync.set({ products: toMap(products) });
-  renderProducts(products, setStatus);
+async function loadProducts() {
+  const storage = await getStorage();
+  if (defaultProductEnabledSwitch) {
+    defaultProductEnabledSwitch.checked = storage.isDefaultProductEnabled;
+  }
+  renderProducts(Object.values(storage.products));
 }
 
-async function addProduct(setStatus: (message: string, isError?: boolean) => void) {
-  const newProduct = readInputs(addInputs);
-  if (!newProduct.name) {
-    setStatus("Name is required.", true);
+async function updateIsDefaultProductEnabled(enabled: boolean) {
+  const storage = await getStorage();
+  storage.isDefaultProductEnabled = enabled;
+  await storage.saveIsDefaultProductEnabled();
+}
+
+async function addProduct() {
+  const newProduct = readInputs(inputElements);
+  if (!newProduct) {
+    setStatus("Missing required product fields", true);
     return;
   }
-  const result = await chrome.storage.sync.get({ products: {} });
-  const products = normalizeProducts(Object.values(result.products as Record<string, Product>));
-  products.push(newProduct);
-  await chrome.storage.sync.set({ products: toMap(products) });
-  renderProducts(products, setStatus);
-  clearInputs(addInputs);
-  toggleAddForm(false);
-  setStatus("Added.", false);
-}
 
-async function removeProduct(key: string, setStatus: (message: string, isError?: boolean) => void) {
-  const result = await chrome.storage.sync.get({ products: {} });
-  const products = result.products as Record<string, Product>;
-  delete products[key];
-  await chrome.storage.sync.set({ products });
-  renderProducts(normalizeProducts(Object.values(products)), setStatus);
-  setStatus("Removed.", false);
-}
-
-async function updateProduct(key: string, updated: Product, setStatus: (message: string, isError?: boolean) => void) {
-  const result = await chrome.storage.sync.get({ products: {} });
-  const products = result.products as Record<string, Product>;
-  if (key !== updated.name && products[key]) {
-    delete products[key];
+  const storage = await getStorage();
+  try {
+    await storage.createProduct(newProduct);
+  } catch (err) {
+    if (err instanceof Error) {
+      setStatus(`Creating product ${newProduct.name} failed: ${err.message}`, true);
+    }
+    return;
   }
-  products[updated.name] = updated;
-  await chrome.storage.sync.set({ products });
-  renderProducts(normalizeProducts(Object.values(products)), setStatus);
-  setStatus("Saved.", false);
+
+  renderProducts(Object.values(storage.products));
+  clearInputs(inputElements);
+  toggleAddForm(false);
+  setStatus(`Product ${newProduct.name} created.`, false);
+}
+
+async function removeProduct(key: string) {
+  const storage = await getStorage();
+  try {
+    await storage.deleteProduct(key);
+  } catch (err) {
+    if (err instanceof Error) {
+      setStatus(`Removing product ${key} failed: ${err.message}`, true);
+    }
+    return;
+  }
+
+  renderProducts(Object.values(storage.products));
+  setStatus(`Product ${key} removed.`, false);
+}
+
+async function updateProduct(updated: Product) {
+  const storage = await getStorage();
+  try {
+    await storage.updateProduct(updated);
+  } catch (err) {
+    if (err instanceof Error) {
+      setStatus(`Updating product ${updated.name} failed: ${err.message}`, true);
+    }
+    return;
+  }
+
+  renderProducts(Object.values(storage.products));
+  setStatus(`Product ${updated.name} saved.`, false);
 }
 
 function toggleAddForm(show: boolean) {
   if (!addProductForm) return;
   addProductForm.classList.toggle("hidden", !show);
-  if (!show) clearInputs(addInputs);
+  if (!show) clearInputs(inputElements);
 }
 
-export function initProducts(setStatus: (message: string, isError?: boolean) => void) {
-  bindElements();
-  loadProducts(setStatus).catch((err) => setStatus(`Error: ${String(err)}`, true));
+export function initProducts() {
+  loadProducts().catch((err) => setStatus(`Error: ${String(err)}`, true));
 
   addProductLink?.addEventListener("click", () => {
     toggleAddForm(true);
@@ -325,7 +350,11 @@ export function initProducts(setStatus: (message: string, isError?: boolean) => 
     toggleAddForm(false);
   });
 
+  defaultProductEnabledSwitch?.addEventListener("change", () => {
+    updateIsDefaultProductEnabled(defaultProductEnabledSwitch.checked).catch((err) => setStatus(`Error: ${String(err)}`, true));
+  });
+
   addProductButton?.addEventListener("click", () => {
-    addProduct(setStatus).catch((err) => setStatus(`Error: ${String(err)}`, true));
+    addProduct().catch((err) => setStatus(`Error: ${String(err)}`, true));
   });
 }
