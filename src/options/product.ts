@@ -1,14 +1,16 @@
-import { getStorage } from "../storage.js";
-import { Product, WeightUnit } from "../types/index.js";
+import { getSettings } from "../utils/settings.js";
+import { ProductMatcher, WeightUnit } from "../types/index.js";
 import { setStatus } from "./status.js";
 
-const prdRequiredKeys = ['name', 'description', 'weight', 'weightUnit', 'originCountry', 'hsCode'] as const;
+const prdRequiredKeys = ['name', 'description', 'manufacturer', 'weight', 'weightUnit', 'originCountry', 'hsCode'] as const;
 const prdOptionalKeys = ['steel', 'aluminum'] as const;
 
 interface ProductHtmlElements {
   name: HTMLInputElement | null,
-  nameIsRegex: HTMLInputElement | null,
+  isRegex: HTMLInputElement | null,
+  isCaseSensitive: HTMLInputElement | null,
   description: HTMLInputElement | null,
+  manufacturer: HTMLSelectElement | null,
   weight: HTMLInputElement | null,
   weightUnit: HTMLSelectElement | null,
   originCountry: HTMLInputElement | null,
@@ -19,8 +21,10 @@ interface ProductHtmlElements {
 
 const inputElements: ProductHtmlElements = {
   name: document.getElementById("p-name") as HTMLInputElement | null,
-  nameIsRegex: document.getElementById("p-name-is-regex") as HTMLInputElement | null,
+  isRegex: document.getElementById("p-name-is-regex") as HTMLInputElement | null,
+  isCaseSensitive: document.getElementById("p-name-is-case-sensitive") as HTMLInputElement | null,
   description: document.getElementById("p-description") as HTMLInputElement | null,
+  manufacturer: document.getElementById("p-manufacturer") as HTMLSelectElement | null,
   weight: document.getElementById("p-weight") as HTMLInputElement | null,
   weightUnit: document.getElementById("p-weight-unit") as HTMLSelectElement | null,
   originCountry: document.getElementById("p-origin-country") as HTMLInputElement | null,
@@ -35,8 +39,9 @@ const addProductLink = document.getElementById("add-product-link") as HTMLButton
 const addProductForm = document.getElementById("add-product-form") as HTMLDivElement | null;
 const addProductButton = document.getElementById("add-product") as HTMLButtonElement | null;
 const cancelAddProductButton = document.getElementById("cancel-add-product") as HTMLButtonElement | null;
+let manufacturerContacts: string[] = [];
 
-function validateProduct(product: Product): boolean {
+function validateProduct(product: ProductMatcher): boolean {
   // Check required fields
   for (let key of prdRequiredKeys) {
     if (!product[key]) {
@@ -46,14 +51,16 @@ function validateProduct(product: Product): boolean {
   return true;
 }
 
-function readInputs(source: ProductHtmlElements): Product | null {
+function readInputs(source: ProductHtmlElements): ProductMatcher | null {
   const weight = Number(source.weight?.value.trim() || "0");
   const steel = Number(source.steel?.value.trim() || "0");
   const aluminum = Number(source.aluminum?.value.trim() || "0");
 
-  const product: Product = {
+  const product: ProductMatcher = {
     name: source.name?.value.trim() || "",
-    nameIsRegex: source.nameIsRegex?.checked || false,
+    isRegex: source.isRegex?.checked || false,
+    isCaseSensitive: source.isCaseSensitive?.checked || false,
+    manufacturer: source.manufacturer?.value.trim() || "",
     description: source.description?.value.trim() || "",
     weight: Number.isFinite(weight) ? weight : 0,
     weightUnit: (source.weightUnit?.value || WeightUnit.G) as WeightUnit,
@@ -71,8 +78,10 @@ function readInputs(source: ProductHtmlElements): Product | null {
 
 function clearInputs(elements: ProductHtmlElements) {
   elements.name!.value = "";
-  elements.nameIsRegex!.checked = false;
+  elements.isRegex!.checked = false;
+  elements.isCaseSensitive!.checked = false;
   elements.description!.value = "";
+  elements.manufacturer!.selectedIndex = 0;
   elements.weight!.value = "";
   elements.weightUnit!.value = WeightUnit.G;
   elements.originCountry!.value = "";
@@ -81,7 +90,7 @@ function clearInputs(elements: ProductHtmlElements) {
   elements.aluminum!.value = "";
 }
 
-function formatSummary(item: Product, index: number) {
+function formatSummary(item: ProductMatcher, index: number) {
   const name = item.name || `Product ${index + 1}`;
   const weight = item.weight ? `${item.weight} ${item.weightUnit}` : "";
   const origin = item.originCountry || "";
@@ -91,14 +100,16 @@ function formatSummary(item: Product, index: number) {
   return parts.join(", ");
 }
 
-function buildEditPanel(item: Product) {
+function buildEditPanel(item: ProductMatcher) {
   const panel = document.createElement("div");
   panel.className = "edit-panel";
 
   const inputs = {
     name: createInput("Name", "text", item.name),
-    nameIsRegex: createCheckbox("nameIsRegex", item.nameIsRegex),
+    isRegex: createCheckbox("Is Regex", item.isRegex),
+    isCaseSensitive: createCheckbox("Case Sensitive", item.isCaseSensitive),
     description: createInput("Description", "text", item.description),
+    manufacturer: createSelect("Manufacturer", manufacturerContacts, item.manufacturer),
     weight: createInput("Weight", "number", String(item.weight ?? "")),
     weightUnit: createSelect("Weight Unit", [WeightUnit.G, WeightUnit.KG, WeightUnit.LB, WeightUnit.OZ], item.weightUnit),
     originCountry: createInput("Origin Country", "text", item.originCountry),
@@ -108,8 +119,9 @@ function buildEditPanel(item: Product) {
   };
   inputs.name.input.disabled = true;
 
-  panel.appendChild(createRow([inputs.name.wrapper, inputs.nameIsRegex.wrapper]));
+  panel.appendChild(createRow([inputs.name.wrapper, inputs.isRegex.wrapper, inputs.isCaseSensitive.wrapper]));
   panel.appendChild(inputs.description.wrapper);
+  panel.appendChild(inputs.manufacturer.wrapper);
   panel.appendChild(createRow([inputs.weight.wrapper, inputs.weightUnit.wrapper]));
   panel.appendChild(createRow([inputs.originCountry.wrapper, inputs.hsCode.wrapper]));
   panel.appendChild(createRow([inputs.steel.wrapper, inputs.aluminum.wrapper]));
@@ -120,9 +132,11 @@ function buildEditPanel(item: Product) {
   const saveButton = document.createElement("button");
   saveButton.textContent = "Save";
   saveButton.addEventListener("click", () => {
-    const updated: Product = {
+    const updated: ProductMatcher = {
       name: inputs.name.input.value.trim(),
-      nameIsRegex: inputs.nameIsRegex.input.checked,
+      isRegex: inputs.isRegex.input.checked,
+      isCaseSensitive: inputs.isCaseSensitive.input.checked,
+      manufacturer: inputs.manufacturer.select.value,
       description: inputs.description.input.value.trim(),
       weight: Number(inputs.weight.input.value || 0),
       weightUnit: inputs.weightUnit.select.value as WeightUnit,
@@ -220,7 +234,25 @@ function createCheckbox(labelText: string, checked: boolean) {
   return { wrapper, input };
 }
 
-function renderProducts(items: Product[]) {
+function setManufacturerOptions(contacts: string[]) {
+  const select = inputElements.manufacturer;
+  if (!select) return;
+
+  const currentValue = select.value;
+  select.innerHTML = "";
+  contacts.forEach((contact) => {
+    const option = document.createElement("option");
+    option.value = contact;
+    option.textContent = contact;
+    select.appendChild(option);
+  });
+
+  if (contacts.length > 0) {
+    select.value = contacts.includes(currentValue) ? currentValue : contacts[0];
+  }
+}
+
+function renderProducts(items: ProductMatcher[]) {
   const list = productList;
   if (!list) return;
   list.innerHTML = "";
@@ -267,7 +299,9 @@ function renderProducts(items: Product[]) {
 }
 
 async function loadProducts() {
-  const storage = await getStorage();
+  const storage = await getSettings();
+  manufacturerContacts = storage.getSortedManufacturerList().map((mfr) => mfr.contact);
+  setManufacturerOptions(manufacturerContacts);
   if (defaultProductEnabledSwitch) {
     defaultProductEnabledSwitch.checked = storage.isDefaultProductEnabled;
   }
@@ -275,7 +309,7 @@ async function loadProducts() {
 }
 
 async function updateIsDefaultProductEnabled(enabled: boolean) {
-  const storage = await getStorage();
+  const storage = await getSettings();
   storage.isDefaultProductEnabled = enabled;
   await storage.saveIsDefaultProductEnabled();
 }
@@ -287,7 +321,9 @@ async function addProduct() {
     return;
   }
 
-  const storage = await getStorage();
+  const storage = await getSettings();
+  manufacturerContacts = storage.getSortedManufacturerList().map((mfr) => mfr.contact);
+  setManufacturerOptions(manufacturerContacts);
   try {
     await storage.createProduct(newProduct);
   } catch (err) {
@@ -304,7 +340,9 @@ async function addProduct() {
 }
 
 async function removeProduct(key: string) {
-  const storage = await getStorage();
+  const storage = await getSettings();
+  manufacturerContacts = storage.getSortedManufacturerList().map((mfr) => mfr.contact);
+  setManufacturerOptions(manufacturerContacts);
   try {
     await storage.deleteProduct(key);
   } catch (err) {
@@ -318,8 +356,10 @@ async function removeProduct(key: string) {
   setStatus(`Product ${key} removed.`, false);
 }
 
-async function updateProduct(updated: Product) {
-  const storage = await getStorage();
+async function updateProduct(updated: ProductMatcher) {
+  const storage = await getSettings();
+  manufacturerContacts = storage.getSortedManufacturerList().map((mfr) => mfr.contact);
+  setManufacturerOptions(manufacturerContacts);
   try {
     await storage.updateProduct(updated);
   } catch (err) {

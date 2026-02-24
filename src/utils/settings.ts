@@ -1,10 +1,12 @@
-import { Manufacturer, Product, Package } from "./types/index.js";
+import { Manufacturer, ProductMatcher, Package, Postage } from "../types/index.js";
 
-class OptionsStorage {
+export class Settings {
     public manufacturers: { [contact: string]: Manufacturer } = {};
-    public products: { [name: string]: Product } = {};
+    public products: { [name: string]: ProductMatcher } = {};
     public packages: Package[] = [];
+    public postages: Postage[] = [];
     public isDefaultProductEnabled: boolean = true;
+    public chitchatsClientId: string = '';
 
     private constructor() { }
 
@@ -13,22 +15,26 @@ class OptionsStorage {
             manufacturers: {},
             products: {},
             packages: [],
+            postages: [],
             isDefaultProductEnabled: true,
+            chitchatsClientId: "",
         });
         this.manufacturers = res.manufacturers;
         this.products = res.products;
         this.packages = res.packages;
+        this.postages = res.postages;
         this.isDefaultProductEnabled = res.isDefaultProductEnabled;
+        this.chitchatsClientId = res.chitchatsClientId;
 
         // Init default product
         if (!this.products.default) {
-            this.products.default = {name: 'default'} as Product;
+            this.products.default = {name: 'default'} as ProductMatcher;
             await this.saveProducts();
         }
     }
 
-    public static async create(): Promise<OptionsStorage> {
-        const instance = new OptionsStorage();
+    public static async create(): Promise<Settings> {
+        const instance = new Settings();
         await instance.init();
         return instance;
     }
@@ -98,7 +104,7 @@ class OptionsStorage {
         this.saveManufacturers();
     }
 
-    public async createProduct(product: Product) {
+    public async createProduct(product: ProductMatcher) {
         if (product.name in this.products) {
             throw new Error(`Product ${product.name} already exists`);
         }
@@ -106,7 +112,7 @@ class OptionsStorage {
         this.saveProducts();
     }
 
-    public async updateProduct(product: Product) {
+    public async updateProduct(product: ProductMatcher) {
         if (!(product.name in this.products)) {
             throw new Error(`Product ${product.name} doesn't exist`);
         }
@@ -122,12 +128,43 @@ class OptionsStorage {
         this.saveProducts();
     }
 
+    public async searchProductMatcher(productName: string): Promise<ProductMatcher | null> {
+        for (const matcher of Object.values(this.products)) {
+            // Skip default product
+            if (matcher.name === 'default') {
+                continue;
+            }
+
+            if (matcher.isRegex) {
+                const flags = matcher.isCaseSensitive ? '' : 'i';
+                const regex = new RegExp(matcher.name, flags);
+                if (regex.test(productName)) {
+                    return matcher;
+                }
+            } else {
+                const name = matcher.isCaseSensitive ? productName : productName.toLowerCase();
+                if (name === matcher.name) {
+                    return matcher;
+                }
+            }
+        }
+        // Return default product if default product is enabled
+        if (this.isDefaultProductEnabled) {
+            return this.products.default;
+        }
+        return null;
+    }
+
     public async saveProducts() {
         await chrome.storage.sync.set({ products: this.products });
     }
 
     public async saveIsDefaultProductEnabled() {
         await chrome.storage.sync.set({ isDefaultProductEnabled: this.isDefaultProductEnabled });
+    }
+
+    public async saveChitchatsClientId() {
+        await chrome.storage.sync.set({ chitchatsClientId: this.chitchatsClientId });
     }
 
     public async createPackage(pkg: Package) {
@@ -153,6 +190,31 @@ class OptionsStorage {
 
     public async savePackages() {
         await chrome.storage.sync.set({ packages: this.packages });
+    }
+
+    public async createPostage(postage: Postage) {
+        this.postages.push(postage);
+        this.savePostages();
+    }
+
+    public async updatePostage(index: number, postage: Postage) {
+        if (index < 0 || index >= this.postages.length) {
+            throw new Error(`Postage at index ${index} doesn't exist`);
+        }
+        this.postages[index] = postage;
+        this.savePostages();
+    }
+
+    public async deletePostage(index: number) {
+        if (index < 0 || index >= this.postages.length) {
+            throw new Error(`Postage at index ${index} doesn't exist`);
+        }
+        this.postages.splice(index, 1);
+        this.savePostages();
+    }
+
+    public async savePostages() {
+        await chrome.storage.sync.set({ postages: this.postages });
     }
 
     public getSortedProductList() {
@@ -186,11 +248,15 @@ class OptionsStorage {
         });
         return pkgs;
     }
+
+    public getSortedPostageList() {
+        return this.postages.slice();
+    }
 }
 
 // Singleton of OptionsStorage
-const optionsProm = OptionsStorage.create();
+const settings = Settings.create();
 
-export async function getStorage(): Promise<OptionsStorage> {
-    return optionsProm;
+export async function getSettings(): Promise<Settings> {
+    return settings;
 }

@@ -1,9 +1,10 @@
-import { getStorage } from "../storage.js";
+import { getSettings } from "../utils/settings.js";
 import { Manufacturer } from "../types/index.js";
 import { setStatus } from "./status.js";
 
 const mfrRequiredKeys = ['contact', 'address1', 'city', 'postalCode', 'provinceState', 'country'] as const;
 const mfrOptionalKeys = ['address2', 'phone', 'email'] as const;
+
 
 interface ManufacturerHtmlElements {
   contact: HTMLInputElement | null,
@@ -223,7 +224,7 @@ function renderManufacturers(mfrs: Manufacturer[]) {
 }
 
 async function loadManufacturers() {
-  const storage = await getStorage();
+  const storage = await getSettings();
   renderManufacturers(storage.getSortedManufacturerList());
 }
 
@@ -234,7 +235,7 @@ async function addManufacturer() {
     return;
   }
 
-  const storage = await getStorage();
+  const storage = await getSettings();
   try {
     await storage.createManufacturer(newMfr);
   } catch (err) {
@@ -251,7 +252,7 @@ async function addManufacturer() {
 }
 
 async function removeManufacturer(contact: string) {
-  const storage = await getStorage();
+  const storage = await getSettings();
   try {
     await storage.deleteManufacturer(contact);
   } catch (err) {
@@ -266,7 +267,7 @@ async function removeManufacturer(contact: string) {
 }
 
 async function updateManufacturer(updated: Manufacturer) {
-  const storage = await getStorage();
+  const storage = await getSettings();
   try {
     await storage.updateManufacturer(updated);
   } catch (err) {
@@ -281,7 +282,7 @@ async function updateManufacturer(updated: Manufacturer) {
 }
 
 async function setDefaultManufacturer(contact: string) {
-  const storage = await getStorage();
+  const storage = await getSettings();
   try {
     await storage.setDefaultManufacturer(contact);
   } catch (err) {

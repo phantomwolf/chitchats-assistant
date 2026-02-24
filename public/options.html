@@ -202,13 +202,14 @@
   <body>
     <div id="status"></div>
     <div class="tabs" role="tablist" aria-label="Options tabs">
-      <button class="tab active" data-tab="manufacturers" role="tab" aria-selected="true">Manufacturers</button>
+      <button class="tab active" data-tab="import-export" role="tab" aria-selected="true">General</button>
+      <button class="tab" data-tab="manufacturers" role="tab" aria-selected="false">Manufacturers</button>
       <button class="tab" data-tab="products" role="tab" aria-selected="false">Products</button>
       <button class="tab" data-tab="packages" role="tab" aria-selected="false">Packages</button>
       <button class="tab" data-tab="postages" role="tab" aria-selected="false">Postages</button>
     </div>
 
-    <section id="tab-manufacturers" class="tab-panel active" role="tabpanel">
+    <section id="tab-manufacturers" class="tab-panel" role="tabpanel">
       <div class="section-title">Manufacturers</div>
       <ul id="manufacturer-list" class="list"></ul>
       <button id="add-manufacturer-link" class="link-button" type="button">Add a new manufacturer</button>
@@ -295,10 +296,20 @@
               <span class="switch-slider"></span>
             </label>
           </div>
+          <div class="field">
+            <label for="p-name-is-case-sensitive">Case Sensitive?</label>
+            <label class="switch">
+              <input id="p-name-is-case-sensitive" type="checkbox" />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
         </div>
 
         <label for="p-description">Description</label>
         <input id="p-description" type="text" />
+
+        <label for="p-manufacturer">Manufacturer</label>
+        <select id="p-manufacturer"></select>
 
         <div class="row">
           <div class="field">
@@ -405,9 +416,47 @@
     </section>
 
     <section id="tab-postages" class="tab-panel" role="tabpanel">
-      <p>Postages settings go here.</p>
+      <div class="section-title">Postages</div>
+      <ul id="postage-list" class="list"></ul>
+      <button id="add-postage-link" class="link-button" type="button">Add another postage</button>
+
+      <div id="add-postage-form" class="hidden">
+        <label for="s-name">Name</label>
+        <input id="s-name" type="text" />
+
+        <button id="add-postage">Add Postage</button>
+        <button id="cancel-add-postage" type="button">Cancel</button>
+      </div>
     </section>
 
-    <script type="module" src="options/index.js"></script>
+    <section id="tab-import-export" class="tab-panel active" role="tabpanel">
+      <div class="section-title">General</div>
+
+      <div class="edit-panel">
+        <label for="general-client-id">ChitChats client ID</label>
+        <input id="general-client-id" type="text" placeholder="e.g. 1234567" />
+        <div class="edit-actions">
+          <button id="save-client-id" type="button">Save</button>
+        </div>
+      </div>
+
+      <div class="edit-panel">
+        <div class="summary">Export all settings from `chrome.storage.sync` to a JSON file for backup or transfer.</div>
+        <div class="edit-actions">
+          <button id="export-settings" type="button">Export</button>
+        </div>
+      </div>
+
+      <div class="edit-panel">
+        <div class="summary">Import settings from a JSON file and replace all values in `chrome.storage.sync`.</div>
+        <div class="edit-actions">
+          <button id="import-settings" type="button">Import</button>
+        </div>
+      </div>
+
+      <input id="import-file" type="file" accept="application/json,.json" class="hidden" />
+    </section>
+
+    <script src="options/index.js"></script>
   </body>
 </html>

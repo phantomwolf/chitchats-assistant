@@ -1,6 +1,9 @@
+import { initImportExport } from "./import-export.js";
 import { initManufacturers } from "./manufacturer.js";
 import { initPackages } from "./package.js";
+import { initPostages } from "./postage.js";
 import { initProducts } from "./product.js";
+import { initGeneralSettings } from "./general.js";
 import { bindStatusElement } from "./status.js";
 
 export {};
@@ -28,6 +31,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initManufacturers();
   initProducts();
   initPackages();
+  initPostages();
+  initGeneralSettings();
+  initImportExport();
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {

@@ -1,4 +1,4 @@
-import { getStorage } from "../storage.js";
+import { getSettings } from "../utils/settings.js";
 import { LengthUnit, Package, PackageType, WeightUnit } from "../types/index.js";
 import { setStatus } from "./status.js";
 
@@ -226,7 +226,7 @@ function renderPackages(items: Package[]) {
 }
 
 async function loadPackages() {
-  const storage = await getStorage();
+  const storage = await getSettings();
   renderPackages(storage.packages);
 }
 
@@ -237,7 +237,7 @@ async function addPackage() {
     return;
   }
 
-  const storage = await getStorage();
+  const storage = await getSettings();
   try {
     await storage.createPackage(pkg);
   } catch (err) {
@@ -254,7 +254,7 @@ async function addPackage() {
 }
 
 async function removePackage(index: number) {
-  const storage = await getStorage();
+  const storage = await getSettings();
   try {
     await storage.deletePackage(index);
   } catch (err) {
@@ -269,7 +269,7 @@ async function removePackage(index: number) {
 }
 
 async function updatePackage(index: number, updated: Package) {
-  const storage = await getStorage();
+  const storage = await getSettings();
   try {
     await storage.updatePackage(index, updated);
   } catch (err) {

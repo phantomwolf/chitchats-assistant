@@ -1,12 +1,13 @@
 {
   "name": "ts-chrome-extension",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.251",
+    "esbuild": "^0.25.10",
     "typescript": "^5.9.3"
   },
   "dependencies": {

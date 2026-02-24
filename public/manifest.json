@@ -1,10 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "TS Chrome Extension",
+  "name": "ChitChats Assistant",
   "version": "0.1.0",
   "action": {
     "default_popup": "popup.html"
   },
   "options_page": "options.html",
-  "permissions": ["activeTab", "scripting", "storage"]
+  "content_scripts": [
+    {
+      "matches": ["https://chitchats.com/clients/*/shipments*"],
+      "js": ["content.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["activeTab", "scripting", "storage", "downloads"]
 }

@@ -1,8 +1,10 @@
 import { WeightUnit } from "./weight-unit.js";
 
-export interface Product {
+export interface ProductMatcher {
     name: string;
-    nameIsRegex: boolean;
+    isRegex: boolean;
+    isCaseSensitive: boolean;
+    manufacturer: string;
     description: string;
     weight: number;
     weightUnit: WeightUnit;
