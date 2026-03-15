@@ -1,18 +1,65 @@
-import { getSettings, Settings } from '../utils/settings.js';
-import { focusAndScroll, selectOptionByValueOrLabel, selectRadio, setInputValue, waitForElement } from '../utils/dom.js';
+import { getSettings } from '../utils/settings.js';
+import { scrollToElement, selectOptionByValueOrLabel, selectRadio, setInputValue, setInputValueNew, waitForElement } from '../utils/dom.js';
 import { Package } from '../types/package.js';
 import { sleep } from '../utils/utils.js';
 
+type InputValueOrFn = string | ((oldValue: string) => string);
+
 export class ChitChatsShipment {
-    orderId: string;
-    shipmentId: string = '';
+    public readonly orderId: string;
+    public readonly status: string;
+    public readonly destinationCountryCode: string;
+    public shipmentId: string = '';
 
     // HTML elements
-    rowElem: HTMLTableRowElement;
+    private readonly rowElem: HTMLTableRowElement;
 
-    constructor(orderId: string, rowElem: HTMLTableRowElement) {
-        this.orderId = orderId;
+    constructor(rowId: string) {
+        const rowElem = document.querySelector<HTMLTableRowElement>(
+            `.js-shipments-table tr.${rowId}`
+        );
+        if (!rowElem) {
+            throw new Error('Failed to find shipment row element');
+        }
         this.rowElem = rowElem;
+        this.orderId = this.getOrderId();
+        this.status = this.getStatus();
+        this.destinationCountryCode = this.getDestinationCountryCode();
+    }
+
+    private getOrderId(): string {
+        const orderElem = this.rowElem.querySelector(`a[href^="https://admin.shopify.com"]`);
+        if (!orderElem) {
+            throw new Error(`Failed to find shopify order ID: ${this.rowElem.className}`);
+        }
+        return orderElem.textContent.trim();
+    }
+
+    private getStatus(): string {
+        const statusElem = this.rowElem.querySelector(`td.table__td--shrink span.text-muted`);
+        if (!statusElem) {
+            throw new Error(`Failed to find shipment status: ${this.rowElem.className}`);
+        }
+        return statusElem.textContent.trim().toLowerCase();
+    }
+
+    private getDestinationCountryCode(): string {
+        const countryElem = this.rowElem.querySelector(`td:nth-child(5) span[data-bs-toggle="tooltip"]`);
+        if (!countryElem) {
+            throw new Error(`Failed to find destination country: ${this.rowElem.className}`);
+        }
+        return countryElem.textContent.trim();
+    }
+
+    private async setInputValue(selector: string, valueOrFn: InputValueOrFn, errorMsg: string) {
+        try {
+            const element = await waitForElement<HTMLInputElement>(selector);
+            const oldValue = element.value;
+            const newValue = (typeof valueOrFn === "function") ? valueOrFn(oldValue) : valueOrFn;
+            setInputValueNew(element, newValue);
+        } catch (err) {
+            throw new Error(`${errorMsg}: ${err}`);
+        }
     }
 
     /**
@@ -23,27 +70,27 @@ export class ChitChatsShipment {
         this.rowElem.click();
         this.rowElem.dispatchEvent(new Event('change', { bubbles: true }));
 
-        const shipmentIdElem = await waitForElement(
+        const shipmentIdElem = await waitForElement<HTMLElement>(
             '.js-right-sidebar-content h2.small-title + .clearfix > strong'
-        ) as HTMLElement;
+        );
         this.shipmentId = shipmentIdElem.textContent.trim();
         if (!this.shipmentId) {
-            throw new Error(`[Order ${this.orderId}] Failed to get shipment ID`);
+            throw new Error(`Failed to get shipment ID`);
         }
 
         // Add package
-        const addPackageElem = await waitForElement(
+        const addPackageElem = await waitForElement<HTMLLinkElement>(
             `main#content .js-right-sidebar-content a.info-panel__edit-link`,
-        ) as HTMLLinkElement;
+        );
         addPackageElem.click();
         addPackageElem.dispatchEvent(new Event('change', { bubbles: true }));
 
         const settings = await getSettings();
-        console.log(`ChitChats client ID: ${settings.chitchatsClientId}`);
+        console.log(`ChitChats client ID: ${settings.chitChatsClientId}`);
         try {
             await waitForElement(`button[aria-label="Close"]`);
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to open shipment popup window`);
+            throw new Error(`Failed to open shipment popup window`);
         }
     }
 
@@ -58,7 +105,7 @@ export class ChitChatsShipment {
         try {
             await waitForElement(tabLinkSel, timeout);
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to find shipment tab links: ${err}`);
+            throw new Error(`Failed to find shipment tab links: ${err}`);
         }
 
         const navStepLinks = document.querySelectorAll<HTMLAnchorElement>(tabLinkSel);
@@ -81,106 +128,114 @@ export class ChitChatsShipment {
         const settings = await getSettings();
         let i = 0;
         while (true) {
-            // Wait for manufacturer contact text input to show up
-            const contactElemSel = `#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_contact`;
-            let contactElem: HTMLInputElement;
+            // Fill in product description
+            const descriptionElemSel = `#shipment_customs_view_model_shipment_items_attributes_${i}_description`;
+            let descriptionElem: HTMLInputElement;
             try {
-                contactElem = await waitForElement(contactElemSel) as HTMLInputElement;
+                descriptionElem = await waitForElement<HTMLInputElement>(descriptionElemSel);
             } catch (err) {
                 console.log('Reached the end of product list');
                 break;
             }
+            const productName = descriptionElem.value;
+            const productMatcher = await settings.searchProductMatcher(productName);
+            if (!productMatcher) {
+                // Can't find a matching product
+                throw new Error(`Failed to find a matching description for '${productName}'`);
+            }
+            await this.setInputValue(
+                descriptionElemSel,
+                productMatcher.description,
+                `Failed to set product ${i} description`
+            );
 
+            // Set to product default price if price is out of range.
+            const unitValueSel = `#shipment_customs_view_model_shipment_items_attributes_${i}_value_amount`;
+            await this.setInputValue(
+                unitValueSel,
+                (oldValue: string) => {
+                    const oldPrice = Number(oldValue) || 0;
+                    if (productMatcher.defaultPrice) {
+                        if ((productMatcher.lowestPrice && oldPrice < productMatcher.lowestPrice)
+                            || (productMatcher.highestPrice && oldPrice > productMatcher.highestPrice)) {
+                                return productMatcher.defaultPrice.toString();
+                        }
+                    }
+                    return oldValue;
+                },
+                `Failed to set product ${i} unit price`
+            );
+
+            // Skip the following steps for CA shipments.
+            if (this.destinationCountryCode === 'CA') {
+                i++;
+                console.log(`[Order ${this.orderId}] Skipping manufacturer info for CA shipments.`);
+                continue;
+            }
+
+            // Wait for manufacturer contact text input to show up
+            const contactElemSel = `#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_contact`;
+            const contactElem = document.querySelector<HTMLInputElement>(contactElemSel);
             // Skip products already processed
-            if (contactElem.value !== '') {
-                console.log(`[Order ${this.orderId}] Product ${i} already processed`);
+            if (contactElem?.value !== '') {
+                console.log(`Product ${i} already processed`);
 
                 // Scroll down
                 try {
-                    await focusAndScroll(contactElemSel, 'start');
+                    await scrollToElement(contactElemSel, 'start');
                 } catch (err) {
-                    throw new Error(`[Order ${this.orderId}] Scrolling to product ${i} failed`);
+                    throw new Error(`Scrolling to product ${i} failed`);
                 }
 
                 i++;
                 continue;
             }
 
-            // Fix unit value for swatch orders
-            const unitValueSel = `#shipment_customs_view_model_shipment_items_attributes_${i}_value_amount`;
-            const unitValueElem = document.querySelector(unitValueSel) as HTMLInputElement;
-            const unitValue = Number(unitValueElem?.value) || 0;
-            if (unitValue < 3) {
-                try {
-                    await setInputValue(unitValueSel, '18');
-                } catch (err) {
-                    throw new Error(`[Order ${this.orderId}] Failed to set product ${i} unit price: ${err}`);
-                }
-            }
-
-            // Fill in product description
-            const descriptionElem = document.querySelector(`#shipment_customs_view_model_shipment_items_attributes_${i}_description`) as HTMLInputElement;
-            const productName = descriptionElem.value;
-            const productMatcher = await settings.searchProductMatcher(productName);
-            if (!productMatcher) {
-                // Can't find a matching product
-                throw new Error(`[Order ${this.orderId}] Failed to find a matching description for '${productName}'`);
-            }
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_description`, productMatcher.description);
-            } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} description: ${err}`);
-            }
-
             // Select origin country
             try {
                 await selectOptionByValueOrLabel(`#shipment_customs_view_model_shipment_items_attributes_${i}_origin_country`, productMatcher.originCountry);
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to select product ${i} origin country: ${err}`);
+                throw new Error(`Failed to select product ${i} origin country: ${err}`);
             }
 
             // Fill in HS code
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_hs_tariff_code`, productMatcher.hsCode);
-            } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} HS code: ${err}`);
-            }
+            await this.setInputValue(
+                `#shipment_customs_view_model_shipment_items_attributes_${i}_hs_tariff_code`,
+                productMatcher.hsCode,
+                `Failed to set product ${i} HS code`
+            );
 
             // Fill in steel and aluminum percentage
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_additional_tariff_details_steel`, '0');
-            } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} steel percentage: ${err}`);
-            }
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_additional_tariff_details_aluminum`, '0');
-            } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} aluminum percentage: ${err}`);
-            }
+            await this.setInputValue(
+                `#shipment_customs_view_model_shipment_items_attributes_${i}_additional_tariff_details_steel`,
+                '0',
+                `Failed to set product ${i} steel percentage`
+            );
+            await this.setInputValue(
+                `#shipment_customs_view_model_shipment_items_attributes_${i}_additional_tariff_details_aluminum`,
+                '0',
+                `Failed to set product ${i} aluminum percentage`
+            );
 
             // Fill in manufacturer contact
             const manufacturer = settings.manufacturers[productMatcher.manufacturer];
             if (!manufacturer) {
-                throw new Error(`[Order ${this.orderId}] Failed to find manufacturer '${productMatcher.manufacturer}'`);
+                throw new Error(`Failed to find manufacturer '${productMatcher.manufacturer}'`);
             }
-            try {
-                await setInputValue(contactElemSel, manufacturer.contact);
-            } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer contact: ${err}`);
-            }
+            await this.setInputValue(contactElemSel, manufacturer.contact, `Failed to set product ${i} manufacturer contact`);
 
             // Fill in manufacturer country
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_country_code`, manufacturer.country);
-            } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer country: ${err}`);
-            }
+            await this.setInputValue(
+                `#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_country_code`,
+                manufacturer.country,
+                `Failed to set product ${i} manufacturer country`
+            );
 
             // Fill in manufacturer address1
             try {
                 await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_street`, manufacturer.address1);
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer address1: ${err}`);
+                throw new Error(`Failed to set product ${i} manufacturer address1: ${err}`);
             }
 
             // Fill in manufacturer address2 if needed
@@ -188,7 +243,7 @@ export class ChitChatsShipment {
                 try {
                     await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_street_2`, manufacturer.address2);
                 } catch (err) {
-                    throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer address2: ${err}`);
+                    throw new Error(`Failed to set product ${i} manufacturer address2: ${err}`);
                 }
             }
 
@@ -196,21 +251,21 @@ export class ChitChatsShipment {
             try {
                 await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_city`, manufacturer.city);
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer city: ${err}`);
+                throw new Error(`Failed to set product ${i} manufacturer city: ${err}`);
             }
 
             // Fill in manufacturer postal code
             try {
                 await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_postal_code`, manufacturer.postalCode);
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer postal code: ${err}`);
+                throw new Error(`Failed to set product ${i} manufacturer postal code: ${err}`);
             }
 
             // Fill in manufacturer phone
             try {
                 await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_phone`, manufacturer.phone);
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer phone: ${err}`);
+                throw new Error(`Failed to set product ${i} manufacturer phone: ${err}`);
             }
 
             // Fill in manufacturer email
@@ -218,21 +273,21 @@ export class ChitChatsShipment {
             try {
                 await setInputValue(emailElemSel, manufacturer.email);
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to set product ${i} manufacturer email: ${err}`);
+                throw new Error(`Failed to set product ${i} manufacturer email: ${err}`);
             }
 
             // Select province
             try {
                 await selectOptionByValueOrLabel(`select[id="shipment_customs_view_model[shipment_items_attributes][${i}]_province_code_ca"]`, manufacturer.provinceState);
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Failed to select product ${i} manufacturer province: ${err}`);
+                throw new Error(`Failed to select product ${i} manufacturer province: ${err}`);
             }
 
             // Scroll down
             try {
-                await focusAndScroll(emailElemSel, 'start')
+                await scrollToElement(emailElemSel, 'start')
             } catch (err) {
-                throw new Error(`[Order ${this.orderId}] Scrolling to product '${productName}' (index ${i}) manufacturer email text input failed`);
+                throw new Error(`Scrolling to product '${productName}' (index ${i}) manufacturer email text input failed`);
             }
 
             i++;
@@ -262,7 +317,7 @@ export class ChitChatsShipment {
         try {
             await waitForElement('form#new_shipment_package_view_model');
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to find package type form: ${err}`);
+            throw new Error(`Failed to find package type form: ${err}`);
         }
 
         // Wait for package type 'parcel' to show up.
@@ -270,7 +325,7 @@ export class ChitChatsShipment {
         try {
             await waitForElement(parcelRadioSel);
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to find package type 'parcel': ${err}`);
+            throw new Error(`Failed to find package type 'parcel': ${err}`);
         }
 
         // Check if package type is already selected.
@@ -279,7 +334,7 @@ export class ChitChatsShipment {
         );
         if (isSelected) {
             // Package already selected.
-            console.log(`[Order ${this.orderId}] Package type already selected`);
+            console.log(`Package type already selected`);
             await this.submitPackageDetails();
             return;
         }
@@ -288,13 +343,14 @@ export class ChitChatsShipment {
         try {
             await selectRadio(parcelRadioSel);
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to select package type 'parcel': ${err}`);
+            throw new Error(`Failed to select package type 'parcel': ${err}`);
         }
 
         // Fill in package weight
-        const weightElem = await waitForElement(
+
+        const weightElem = await waitForElement<HTMLInputElement>(
             'input#shipment_package_view_model_weight_amount'
-        ) as HTMLInputElement;
+        );
         let weightValue = Number(weightElem.value);
 
         // Add the weight of the package itself to the total weight
@@ -311,31 +367,31 @@ export class ChitChatsShipment {
             }
         }
         if (!pkg) {
-            throw new Error(`[Order ${this.orderId}] No suitable package size found`);
+            throw new Error(`No suitable package size found`);
         }
 
         // Fill in package size
         try {
             await setInputValue('input#shipment_package_view_model_size_x_amount', pkg.length.toString());
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to set package length: ${err}`);
+            throw new Error(`Failed to set package length: ${err}`);
         }
         try {
             await setInputValue('input#shipment_package_view_model_size_y_amount', pkg.width.toString());
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to set package width: ${err}`);
+            throw new Error(`Failed to set package width: ${err}`);
         }
         try {
             await setInputValue('input#shipment_package_view_model_size_z_amount', pkg.height.toString());
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to set package height: ${err}`);
+            throw new Error(`Failed to set package height: ${err}`);
         }
 
         // Scroll to the bottom
         try {
-            await focusAndScroll('input#shipment_package_view_model_size_z_amount', 'start');
+            await scrollToElement('input#shipment_package_view_model_size_z_amount', 'start');
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to scroll to the bottom`);
+            throw new Error(`Failed to scroll to the bottom`);
         }
 
         await this.submitPackageDetails();
@@ -348,9 +404,9 @@ export class ChitChatsShipment {
      * Click 'Save and Continue' button to submit package details.
      */
     async submitPackageDetails() {
-        const submitBtn = await waitForElement(
+        const submitBtn = await waitForElement<HTMLInputElement>(
             `form#new_shipment_package_view_model input[type="submit"][name="save"]`
-        ) as HTMLInputElement;
+        );
         submitBtn.click();
         submitBtn.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -362,7 +418,7 @@ export class ChitChatsShipment {
         try {
             await waitForElement('form#new_shipment_platform_postage_view_model');
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to find postage details form: ${err}`);
+            throw new Error(`Failed to find postage details form: ${err}`);
         }
 
         const isSelected = document.querySelector(
@@ -370,7 +426,7 @@ export class ChitChatsShipment {
         );
         if (isSelected) {
             // Postage already selected.
-            console.log(`[Order ${this.orderId}] Postage rate already selected`);
+            console.log(`Postage rate already selected`);
             return;
         }
 
@@ -382,13 +438,13 @@ export class ChitChatsShipment {
                 try {
                     await selectRadio(radioElemSel);
                 } catch (err) {
-                    throw new Error(`[Order ${this.orderId}] Failed to select postage rate '${pos.name}': ${err}`);
+                    throw new Error(`Failed to select postage rate '${pos.name}': ${err}`);
                 }
                 postageSelected = true;
                 try {
-                    await focusAndScroll(radioElemSel, 'start');
+                    await scrollToElement(radioElemSel, 'start');
                 } catch (err) {
-                    throw new Error(`[Order ${this.orderId}] Scrolling to postage rate '${pos.name}' failed: ${err}`);
+                    throw new Error(`Scrolling to postage rate '${pos.name}' failed: ${err}`);
                 }
                 break;
             } catch (err) {
@@ -397,7 +453,7 @@ export class ChitChatsShipment {
             }
         }
         if (!postageSelected) {
-            throw new Error(`[Order ${this.orderId}] No suitable postage rate found`);
+            throw new Error(`No suitable postage rate found`);
         }
 
         // Buy shipping label
@@ -408,9 +464,9 @@ export class ChitChatsShipment {
     }
 
     async submitPostageDetails() {
-        const submitBtn = await waitForElement(
+        const submitBtn = await waitForElement<HTMLInputElement>(
             `form#new_shipment_platform_postage_view_model input[type="submit"][name="buy"]`
-        ) as HTMLInputElement;
+        );
         submitBtn.click();
         submitBtn.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -418,15 +474,15 @@ export class ChitChatsShipment {
     async downloadShippingLabel() {
         const linkSel = '.js-print-rows a[href*=".pdf"]';
         try {
-            await waitForElement(linkSel);
+            await waitForElement(linkSel, 10000);
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Failed to find shipping label download link: ${err}`);
+            throw new Error(`Failed to find shipping label download link: ${err}`);
         }
 
         const links = document.querySelectorAll<HTMLAnchorElement>(linkSel);
         const downloadLink = Array.from(links).find(link => link.textContent?.trim().toLowerCase().includes('download'));
         if (!downloadLink) {
-            throw new Error(`[Order ${this.orderId}] Failed to find shipping label download link`);
+            throw new Error(`Failed to find shipping label download link`);
         }
 
         try {
@@ -436,22 +492,22 @@ export class ChitChatsShipment {
                 filename: `ChitChatsLabels/${this.orderId}.pdf`,
             });
         } catch (err) {
-            throw new Error(`[Order ${this.orderId}] Downloading shipping label failed: ${err}`);
+            throw new Error(`Downloading shipping label failed: ${err}`);
         }
 
-        sleep(500);
+        await sleep(500);
 
         // Click 'Done' to close the dialog
         const buttons = document.querySelectorAll<HTMLAnchorElement>('.js-modal-close');
         const doneBtn = Array.from(buttons).find(btn => btn.textContent?.trim().toLowerCase().includes('done'));
         if (!doneBtn) {
-            throw new Error(`[Order ${this.orderId}] Closing shipment dialog failed`);
+            throw new Error(`Closing shipment dialog failed`);
         }
         const eventOptions = { bubbles: true, cancelable: true, view: window };
         doneBtn.dispatchEvent(new MouseEvent('mousedown', eventOptions));
         doneBtn.dispatchEvent(new MouseEvent('mouseup', eventOptions));
         doneBtn.click();
 
-        sleep(500);
+        await sleep(500);
     }
 }

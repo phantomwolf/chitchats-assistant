@@ -1,22 +1,27 @@
 export {};
 
-import { ChitChatsPendingPage } from "./content/chitchats-pending.js";
+import { ChitChatsPendingShipmentPage } from "./content/chitchats-shipment-page.js";
+import { ChitChatsShipment } from "./content/chitchats-shipment.js";
+import { sleep } from "./utils/utils.js";
 
 const CONTENT_INIT_KEY = "__chitchatsContentRunnerInitialized";
 
 type PopupMessage =
   | { source: "popup"; command: "ping" }
-  | { source: "popup"; command: "run_once" }
-  | { source: "popup"; command: "run_all" };
+  | { source: "popup"; command: "buy_selected" }
+  | { source: "popup"; command: "buy_all" };
 
-async function run(once: boolean = false) {
-  const pendingPage = new ChitChatsPendingPage();
-  let shipments = pendingPage.getPendingShipments();
-  if (once) {
-    shipments = shipments.slice(0, 1);
-  }
-  console.log(shipments);
-  for (const shipment of shipments) {
+async function buyShipments(isSelected: boolean = false) {
+  const shipmentPage = new ChitChatsPendingShipmentPage();
+  const shipmentRowIds = shipmentPage.getShipmentRowIds(isSelected);
+  for (const rowId of shipmentRowIds) {
+    const shipment = new ChitChatsShipment(rowId);
+    if (shipment.status !== "incomplete") {
+      console.log(
+        `Skipping order ${shipment.orderId} due to its status "${shipment.status}" isn't "incomplete"`);
+      continue;
+    }
+
     try {
       await shipment.openPopup();
       await shipment.fillProductDetails();
@@ -25,9 +30,13 @@ async function run(once: boolean = false) {
       await shipment.downloadShippingLabel();
     } catch (err) {
       if (err instanceof Error) {
-        console.log(`[Order ${shipment.orderId}] Failed to buy shipping label: ${err.message}`);
+        throw new Error(`[Order ${shipment.orderId}] ${err.message}`);
+      } else {
+        throw new Error(`[Order ${shipment.orderId}] ${err}`);
       }
     }
+
+    await sleep(1000);
   }
 }
 
@@ -49,15 +58,15 @@ function initContentRunner() {
       return;
     }
 
-    if (payload.command === "run_once") {
-      run(true)
+    if (payload.command === "buy_selected") {
+      buyShipments(true)
         .then(() => sendResponse({ ok: true }))
         .catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }
 
-    if (payload.command === "run_all") {
-      run(false)
+    if (payload.command === "buy_all") {
+      buyShipments(false)
         .then(() => sendResponse({ ok: true }))
         .catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;

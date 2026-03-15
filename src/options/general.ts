@@ -7,13 +7,13 @@ const saveClientIdButton = document.getElementById("save-client-id") as HTMLButt
 async function loadGeneralSettings() {
   if (!clientIdInput) return;
   const settings = await getSettings();
-  clientIdInput.value = settings.chitchatsClientId || "";
+  clientIdInput.value = settings.chitChatsClientId || "";
 }
 
 async function saveGeneralSettings() {
   const settings = await getSettings();
   const value = clientIdInput?.value.trim() || "";
-  settings.chitchatsClientId = value;
+  settings.chitChatsClientId = value;
   await settings.saveChitchatsClientId();
   setStatus("General settings saved.", false);
 }

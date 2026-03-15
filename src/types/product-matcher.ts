@@ -12,4 +12,7 @@ export interface ProductMatcher {
     hsCode: string;
     steel: number;
     aluminum: number;
+    lowestPrice?: number;
+    highestPrice?: number;
+    defaultPrice?: number;
 }

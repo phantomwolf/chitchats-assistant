@@ -3,8 +3,6 @@ import { ProductMatcher, WeightUnit } from "../types/index.js";
 import { setStatus } from "./status.js";
 
 const prdRequiredKeys = ['name', 'description', 'manufacturer', 'weight', 'weightUnit', 'originCountry', 'hsCode'] as const;
-const prdOptionalKeys = ['steel', 'aluminum'] as const;
-
 interface ProductHtmlElements {
   name: HTMLInputElement | null,
   isRegex: HTMLInputElement | null,
@@ -17,6 +15,9 @@ interface ProductHtmlElements {
   hsCode: HTMLInputElement | null,
   steel: HTMLInputElement | null,
   aluminum: HTMLInputElement | null,
+  lowestPrice: HTMLInputElement | null,
+  highestPrice: HTMLInputElement | null,
+  defaultPrice: HTMLInputElement | null,
 }
 
 const inputElements: ProductHtmlElements = {
@@ -30,7 +31,10 @@ const inputElements: ProductHtmlElements = {
   originCountry: document.getElementById("p-origin-country") as HTMLInputElement | null,
   hsCode: document.getElementById("p-hs-code") as HTMLInputElement | null,
   steel: document.getElementById("p-steel") as HTMLInputElement | null,
-  aluminum: document.getElementById("p-aluminum") as HTMLInputElement | null
+  aluminum: document.getElementById("p-aluminum") as HTMLInputElement | null,
+  lowestPrice: document.getElementById("p-lowest-price") as HTMLInputElement | null,
+  highestPrice: document.getElementById("p-highest-price") as HTMLInputElement | null,
+  defaultPrice: document.getElementById("p-default-price") as HTMLInputElement | null
 };
 
 const productList = document.getElementById("product-list") as HTMLUListElement | null;
@@ -51,6 +55,16 @@ function validateProduct(product: ProductMatcher): boolean {
   return true;
 }
 
+function parseOptionalNumber(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function readInputs(source: ProductHtmlElements): ProductMatcher | null {
   const weight = Number(source.weight?.value.trim() || "0");
   const steel = Number(source.steel?.value.trim() || "0");
@@ -67,7 +81,10 @@ function readInputs(source: ProductHtmlElements): ProductMatcher | null {
     originCountry: source.originCountry?.value.trim() || "",
     hsCode: source.hsCode?.value.trim() || "",
     steel: Number.isFinite(steel) ? steel : 0,
-    aluminum: Number.isFinite(aluminum) ? aluminum : 0
+    aluminum: Number.isFinite(aluminum) ? aluminum : 0,
+    lowestPrice: parseOptionalNumber(source.lowestPrice?.value || ""),
+    highestPrice: parseOptionalNumber(source.highestPrice?.value || ""),
+    defaultPrice: parseOptionalNumber(source.defaultPrice?.value || "")
   };
 
   if (!validateProduct(product)) {
@@ -88,6 +105,9 @@ function clearInputs(elements: ProductHtmlElements) {
   elements.hsCode!.value = "";
   elements.steel!.value = "";
   elements.aluminum!.value = "";
+  elements.lowestPrice!.value = "";
+  elements.highestPrice!.value = "";
+  elements.defaultPrice!.value = "";
 }
 
 function formatSummary(item: ProductMatcher, index: number) {
@@ -115,7 +135,10 @@ function buildEditPanel(item: ProductMatcher) {
     originCountry: createInput("Origin Country", "text", item.originCountry),
     hsCode: createInput("HS Code", "text", item.hsCode),
     steel: createInput("Steel", "number", String(item.steel ?? "")),
-    aluminum: createInput("Aluminum", "number", String(item.aluminum ?? ""))
+    aluminum: createInput("Aluminum", "number", String(item.aluminum ?? "")),
+    lowestPrice: createInput("Lowest Price", "number", String(item.lowestPrice ?? "")),
+    highestPrice: createInput("Highest Price", "number", String(item.highestPrice ?? "")),
+    defaultPrice: createInput("Default Price", "number", String(item.defaultPrice ?? ""))
   };
   inputs.name.input.disabled = true;
 
@@ -125,6 +148,7 @@ function buildEditPanel(item: ProductMatcher) {
   panel.appendChild(createRow([inputs.weight.wrapper, inputs.weightUnit.wrapper]));
   panel.appendChild(createRow([inputs.originCountry.wrapper, inputs.hsCode.wrapper]));
   panel.appendChild(createRow([inputs.steel.wrapper, inputs.aluminum.wrapper]));
+  panel.appendChild(createRow([inputs.lowestPrice.wrapper, inputs.highestPrice.wrapper, inputs.defaultPrice.wrapper]));
 
   const actions = document.createElement("div");
   actions.className = "edit-actions";
@@ -143,7 +167,10 @@ function buildEditPanel(item: ProductMatcher) {
       originCountry: inputs.originCountry.input.value.trim(),
       hsCode: inputs.hsCode.input.value.trim(),
       steel: Number(inputs.steel.input.value || 0),
-      aluminum: Number(inputs.aluminum.input.value || 0)
+      aluminum: Number(inputs.aluminum.input.value || 0),
+      lowestPrice: parseOptionalNumber(inputs.lowestPrice.input.value),
+      highestPrice: parseOptionalNumber(inputs.highestPrice.input.value),
+      defaultPrice: parseOptionalNumber(inputs.defaultPrice.input.value)
     };
     if (!updated.name) {
       setStatus("Name is required.", true);

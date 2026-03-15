@@ -6,7 +6,7 @@ export class Settings {
     public packages: Package[] = [];
     public postages: Postage[] = [];
     public isDefaultProductEnabled: boolean = true;
-    public chitchatsClientId: string = '';
+    public chitChatsClientId: string = '';
 
     private constructor() { }
 
@@ -17,14 +17,14 @@ export class Settings {
             packages: [],
             postages: [],
             isDefaultProductEnabled: true,
-            chitchatsClientId: "",
+            chitChatsClientId: "",
         });
         this.manufacturers = res.manufacturers;
         this.products = res.products;
         this.packages = res.packages;
         this.postages = res.postages;
         this.isDefaultProductEnabled = res.isDefaultProductEnabled;
-        this.chitchatsClientId = res.chitchatsClientId;
+        this.chitChatsClientId = res.chitChatsClientId;
 
         // Init default product
         if (!this.products.default) {
@@ -60,7 +60,7 @@ export class Settings {
             throw new Error(`Manufacturer ${mfr.contact} already exists`);
         }
         this.manufacturers[mfr.contact] = mfr;
-        this.saveManufacturers();
+        await this.saveManufacturers();
     }
 
     public async updateManufacturer(mfr: Manufacturer) {
@@ -68,7 +68,7 @@ export class Settings {
             throw new Error(`Manufacturer ${mfr.contact} doesn't exist`);
         }
         this.manufacturers[mfr.contact] = mfr;
-        this.saveManufacturers();
+        await this.saveManufacturers();
     }
 
     public async deleteManufacturer(contact: string) {
@@ -82,7 +82,7 @@ export class Settings {
         }
 
         delete this.manufacturers[contact];
-        this.saveManufacturers();
+        await this.saveManufacturers();
     }
 
     public async saveManufacturers() {
@@ -101,7 +101,7 @@ export class Settings {
 
         // Set manufacturer as default
         this.manufacturers[contact].isDefault = true;
-        this.saveManufacturers();
+        await this.saveManufacturers();
     }
 
     public async createProduct(product: ProductMatcher) {
@@ -109,7 +109,7 @@ export class Settings {
             throw new Error(`Product ${product.name} already exists`);
         }
         this.products[product.name] = product;
-        this.saveProducts();
+        await this.saveProducts();
     }
 
     public async updateProduct(product: ProductMatcher) {
@@ -117,7 +117,7 @@ export class Settings {
             throw new Error(`Product ${product.name} doesn't exist`);
         }
         this.products[product.name] = product;
-        this.saveProducts();
+        await this.saveProducts();
     }
 
     public async deleteProduct(name: string) {
@@ -125,7 +125,7 @@ export class Settings {
             throw new Error(`Product ${name} doesn't exist`);
         }
         delete this.products[name];
-        this.saveProducts();
+        await this.saveProducts();
     }
 
     public async searchProductMatcher(productName: string): Promise<ProductMatcher | null> {
@@ -143,7 +143,8 @@ export class Settings {
                 }
             } else {
                 const name = matcher.isCaseSensitive ? productName : productName.toLowerCase();
-                if (name === matcher.name) {
+                const pattern = matcher.isCaseSensitive ? matcher.name : matcher.name.toLowerCase();
+                if (name.includes(pattern)) {
                     return matcher;
                 }
             }
@@ -164,12 +165,12 @@ export class Settings {
     }
 
     public async saveChitchatsClientId() {
-        await chrome.storage.sync.set({ chitchatsClientId: this.chitchatsClientId });
+        await chrome.storage.sync.set({ chitChatsClientId: this.chitChatsClientId });
     }
 
     public async createPackage(pkg: Package) {
         this.packages.push(pkg);
-        this.savePackages();
+        await this.savePackages();
     }
 
     public async updatePackage(index: number, pkg: Package) {
@@ -177,7 +178,7 @@ export class Settings {
             throw new Error(`Package at index ${index} doesn't exist`);
         }
         this.packages[index] = pkg;
-        this.savePackages();
+        await this.savePackages();
     }
 
     public async deletePackage(index: number) {
@@ -185,7 +186,7 @@ export class Settings {
             throw new Error(`Package at index ${index} doesn't exist`);
         }
         this.packages.splice(index, 1);
-        this.savePackages();
+        await this.savePackages();
     }
 
     public async savePackages() {
@@ -194,7 +195,7 @@ export class Settings {
 
     public async createPostage(postage: Postage) {
         this.postages.push(postage);
-        this.savePostages();
+        await this.savePostages();
     }
 
     public async updatePostage(index: number, postage: Postage) {
@@ -202,7 +203,7 @@ export class Settings {
             throw new Error(`Postage at index ${index} doesn't exist`);
         }
         this.postages[index] = postage;
-        this.savePostages();
+        await this.savePostages();
     }
 
     public async deletePostage(index: number) {
@@ -210,7 +211,7 @@ export class Settings {
             throw new Error(`Postage at index ${index} doesn't exist`);
         }
         this.postages.splice(index, 1);
-        this.savePostages();
+        await this.savePostages();
     }
 
     public async savePostages() {

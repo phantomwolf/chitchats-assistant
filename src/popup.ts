@@ -1,17 +1,17 @@
 export {};
 
-const runOnceButton = document.getElementById("run-once") as HTMLButtonElement | null;
-const runAllButton = document.getElementById("run-all") as HTMLButtonElement | null;
-const statusEl = document.getElementById("status") as HTMLDivElement | null;
+const buySelectedButton = document.getElementById("buy-selected") as HTMLButtonElement | null;
+const buyAllButton = document.getElementById("buy-all") as HTMLButtonElement | null;
+const statusElem = document.getElementById("status") as HTMLDivElement | null;
 let isRunning = false;
 
-type PopupCommand = "ping" | "run_once" | "run_all";
+type PopupCommand = "ping" | "buy_selected" | "buy_all";
 type PopupMessage = { source: "popup"; command: PopupCommand };
 type ContentResponse = { ok: boolean; error?: string };
 const NO_RECEIVER_ERROR = "Could not establish connection. Receiving end does not exist.";
 
 function setStatus(message: string) {
-  if (statusEl) statusEl.textContent = message;
+  if (statusElem) statusElem.textContent = message;
 }
 
 function getActiveTabId(): Promise<number> {
@@ -81,18 +81,18 @@ async function pingThenSend(tabId: number, command: Exclude<PopupCommand, "ping"
 }
 
 function disableButtons(disabled: boolean) {
-  if (runOnceButton) runOnceButton.disabled = disabled;
-  if (runAllButton) runAllButton.disabled = disabled;
+  if (buySelectedButton) buySelectedButton.disabled = disabled;
+  if (buyAllButton) buyAllButton.disabled = disabled;
 }
 
-runOnceButton?.addEventListener("click", () => {
+buySelectedButton?.addEventListener("click", () => {
   if (isRunning) return;
   isRunning = true;
   disableButtons(true);
   setStatus("Pinging content script...");
   getActiveTabId()
-    .then((tabId) => pingThenSend(tabId, "run_once"))
-    .then(() => setStatus("ChitChats Assistant started once."))
+    .then((tabId) => pingThenSend(tabId, "buy_selected"))
+    .then(() => setStatus("Purchased shipping labels for selected ChitChats shipments."))
     .catch((err) => {
       setStatus(`${String(err)}`);
     })
@@ -102,14 +102,14 @@ runOnceButton?.addEventListener("click", () => {
     });
 });
 
-runAllButton?.addEventListener("click", () => {
+buyAllButton?.addEventListener("click", () => {
   if (isRunning) return;
   isRunning = true;
   disableButtons(true);
   setStatus("Pinging content script...");
   getActiveTabId()
-    .then((tabId) => pingThenSend(tabId, "run_all"))
-    .then(() => setStatus("ChitChats Assistant started."))
+    .then((tabId) => pingThenSend(tabId, "buy_all"))
+    .then(() => setStatus("Purchased shipping labels for all pending ChitChats shipments."))
     .catch((err) => setStatus(`${String(err)}
 ChitChats Assistant can only run on ChitChats pending shipments page: https://chitchats.com/clients/*/shipments`))
     .finally(() => {
