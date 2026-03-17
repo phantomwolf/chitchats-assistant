@@ -1,10 +1,10 @@
-import { initImportExport } from "./import-export.js";
-import { initManufacturers } from "./manufacturer.js";
-import { initPackages } from "./package.js";
-import { initPostages } from "./postage.js";
-import { initProducts } from "./product.js";
-import { initGeneralSettings } from "./general.js";
-import { bindStatusElement } from "./status.js";
+import { initImportExport } from "./options/import-export.js";
+import { initManufacturers } from "./options/manufacturer.js";
+import { initPackages } from "./options/package.js";
+import { initPostages } from "./options/postage.js";
+import { initProducts } from "./options/product.js";
+import { initGeneralSettings } from "./options/general.js";
+import { bindStatusElement } from "./options/status.js";
 
 export {};
 

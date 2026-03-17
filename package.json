@@ -7,6 +7,7 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.251",
+    "archiver": "^7.0.1",
     "esbuild": "^0.25.10",
     "typescript": "^5.9.3"
   },

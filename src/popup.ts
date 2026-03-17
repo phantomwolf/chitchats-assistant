@@ -9,6 +9,8 @@ type PopupCommand = "ping" | "buy_selected" | "buy_all";
 type PopupMessage = { source: "popup"; command: PopupCommand };
 type ContentResponse = { ok: boolean; error?: string };
 const NO_RECEIVER_ERROR = "Could not establish connection. Receiving end does not exist.";
+const CONTENT_SCRIPT_UNAVAILABLE_ERROR =
+  "Content script is unavailable on this page. Open a ChitChats pending shipments page: https://chitchats.com/clients/*/shipments";
 
 function setStatus(message: string) {
   if (statusElem) statusElem.textContent = message;
@@ -39,18 +41,6 @@ function sendMessageToTab(tabId: number, message: PopupMessage): Promise<Content
   });
 }
 
-function injectContentScript(tabId: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }, () => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      resolve();
-    });
-  });
-}
-
 async function ensureContentScriptConnected(tabId: number) {
   try {
     const pingResponse = await sendMessageToTab(tabId, { source: "popup", command: "ping" });
@@ -59,15 +49,10 @@ async function ensureContentScriptConnected(tabId: number) {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes(NO_RECEIVER_ERROR)) {
-      throw error;
+    if (message.includes(NO_RECEIVER_ERROR)) {
+      throw new Error(CONTENT_SCRIPT_UNAVAILABLE_ERROR);
     }
-
-    await injectContentScript(tabId);
-    const retryPingResponse = await sendMessageToTab(tabId, { source: "popup", command: "ping" });
-    if (!retryPingResponse?.ok) {
-      throw new Error(retryPingResponse?.error || "Content script ping failed after injection.");
-    }
+    throw error;
   }
 }
 

@@ -1,5 +1,7 @@
 import { execSync } from "node:child_process";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, rename, rm } from "node:fs/promises";
+import * as fs from "node:fs";
+import archiver from "archiver";
 
 async function main() {
   let build;
@@ -19,7 +21,7 @@ async function main() {
       content: "src/content.ts",
       background: "src/background.ts",
       popup: "src/popup.ts",
-      "options/index": "src/options/index.ts",
+      options: "src/options.ts",
     },
     bundle: true,
     format: "iife",
@@ -30,6 +32,23 @@ async function main() {
   });
 
   await cp("public", "dist", { recursive: true });
+
+  // Generate zip file.
+  const zipFileName = "chitchats-assistant.zip";
+  const zipFile = fs.createWriteStream(zipFileName);
+  const archive = archiver("zip", { zlib: { level: 9 } });
+  zipFile.on("close", () => {
+    console.log(`ZIP created: ${archive.pointer()} bytes`);
+  });
+  archive.on("error", (err) => {
+    throw err;
+  });
+  archive.pipe(zipFile);
+  archive.directory("dist/", false);
+  await archive.finalize();
+
+  // Move zip file to dist/ folder.
+  await rename(zipFileName, `dist/${zipFileName}`);
 }
 
 main().catch((err) => {
