@@ -95,8 +95,7 @@ buyAllButton?.addEventListener("click", () => {
   getActiveTabId()
     .then((tabId) => pingThenSend(tabId, "buy_all"))
     .then(() => setStatus("Purchased shipping labels for all pending ChitChats shipments."))
-    .catch((err) => setStatus(`${String(err)}
-ChitChats Assistant can only run on ChitChats pending shipments page: https://chitchats.com/clients/*/shipments`))
+    .catch((err) => setStatus(`${String(err)}`))
     .finally(() => {
       isRunning = false;
       disableButtons(false);

@@ -28,11 +28,16 @@ export class ChitChatsShipment {
     }
 
     private getOrderId(): string {
-        const orderElem = this.rowElem.querySelector(`a[href^="https://admin.shopify.com"]`);
+        const orderElem = this.rowElem.querySelector(`span[data-bs-original-title*="Shopify order:"]`);
         if (!orderElem) {
             throw new Error(`Failed to find shopify order ID: ${this.rowElem.className}`);
         }
-        return orderElem.textContent.trim();
+        const attr = orderElem.getAttribute('data-bs-original-title') || '';
+        const match = attr.match(/Shopify order:\s*(\d+)/i);
+        if (!match) {
+            throw new Error(`Failed to find shopify order ID: ${this.rowElem.className} = ${attr}`);
+        }
+        return match[1];
     }
 
     private getStatus(): string {
