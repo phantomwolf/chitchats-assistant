@@ -1,3 +1,29 @@
+import { sleep } from "./utils";
+
+/**
+ * Simulate a real click event by a user.
+ * @param element The HTML element to be clicked.
+ * @param delayMs Random delay.
+ */
+export async function click<T extends HTMLElement>(element: T, delayMs = 60) {
+    const rect = element.getBoundingClientRect();
+    const eventOptions = {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        // Pick a random spot inside the actual button
+        clientX: rect.left + (Math.random() * rect.width),
+        clientY: rect.top + (Math.random() * rect.height),
+        buttons: 1 // Indicates the primary mouse button (usually left)
+    };
+
+    element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+    // The physical time a finger stays on the mouse/screen (60ms to 120ms)
+    await sleep(Math.random() * delayMs + 60);
+    element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+    element.click();
+}
+
 /**
  * Waits for an element to appear.
  * @param selector - The CSS selector to watch for.
@@ -82,7 +108,7 @@ export async function waitForElementByText<T extends Element>(selector: string, 
  * @param element HTML input element to set the value for.
  * @param value The value to be set.
 */
-export function setInputValueNew(element: HTMLInputElement, value: string) {
+export function setInputValue(element: HTMLInputElement, value: string) {
     element.value = value;
 
     // Trigger events(input, change) to notify listeners.
@@ -91,21 +117,6 @@ export function setInputValueNew(element: HTMLInputElement, value: string) {
     element.dispatchEvent(new Event('change', eventConfig));
 }
 
-/**
- * Set the value of an text input.
- * @param selector CSS selector to select the input element.
- * @param text The text to be typed into the input text.
- * @param timeout Timeout(unit: ms) before the element shows up.
-*/
-export async function setInputValue(selector: string, text: string, timeout = 3000) {
-    const inputElem = await waitForElement(selector, timeout) as HTMLInputElement;
-    inputElem.value = text;
-
-    // Trigger events: input, change
-    const eventConfig = { bubbles: true };
-    inputElem.dispatchEvent(new Event('input', eventConfig));
-    inputElem.dispatchEvent(new Event('change', eventConfig));
-}
 
 /**
  * Selects an option in a dropdown menu by its value and triggers change events.
@@ -115,6 +126,7 @@ export async function setInputValue(selector: string, text: string, timeout = 30
  */
 export async function selectOptionByValueOrLabel(selector: string, valueOrLabel: string, timeout = 3000) {
     const selectElem = await waitForElement(selector, timeout) as HTMLSelectElement;
+    await sleep(Math.random() * 300 + 200);
 
     // Try to select by value
     const valueExists = Array.from(selectElem.options).some(opt => opt.value === valueOrLabel);
@@ -140,17 +152,18 @@ export async function selectOptionByValueOrLabel(selector: string, valueOrLabel:
  * @param timeout Max time to wait before selecting the radio option.
  */
 export async function selectRadio(selector: string, timeout = 3000) {
-    const radioElem = await waitForElement(selector, timeout) as HTMLInputElement;
-    radioElem.click();
-    radioElem.dispatchEvent(new Event('change', { bubbles: true }));
+    const radioElem = await waitForElement<HTMLInputElement>(selector, timeout);
+    await click(radioElem);
 }
 
 /**
  * Focuses and scrolls to an element, ensuring the DOM is ready.
  */
 export async function scrollToElement(selector: string, position: ScrollLogicalPosition) {
-    const element = await waitForElement(selector) as HTMLElement;
     // We wait for the next frame to ensure the browser has updated the element's position in the layout.
     await new Promise(requestAnimationFrame);
-    element.scrollIntoView({ behavior: 'instant', block: position });
+
+    const element = await waitForElement<HTMLElement>(selector);
+    element.scrollIntoView({ behavior: 'smooth', block: position });
+    await sleep(Math.random() * 2000 + 1000);
 }

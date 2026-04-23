@@ -1,5 +1,5 @@
 import { getSettings } from '../utils/settings.js';
-import { scrollToElement, selectOptionByValueOrLabel, selectRadio, setInputValue, setInputValueNew, waitForElement } from '../utils/dom.js';
+import { scrollToElement, selectOptionByValueOrLabel, selectRadio, setInputValue, waitForElement, click } from '../utils/dom.js';
 import { Package } from '../types/package.js';
 import { sleep } from '../utils/utils.js';
 
@@ -61,7 +61,8 @@ export class ChitChatsShipment {
             const element = await waitForElement<HTMLInputElement>(selector);
             const oldValue = element.value;
             const newValue = (typeof valueOrFn === "function") ? valueOrFn(oldValue) : valueOrFn;
-            setInputValueNew(element, newValue);
+            setInputValue(element, newValue);
+            await sleep(Math.random() * 200 + 100);
         } catch (err) {
             throw new Error(`${errorMsg}: ${err}`);
         }
@@ -72,8 +73,7 @@ export class ChitChatsShipment {
      */
     async openPopup() {
         // Click the shipment row.
-        this.rowElem.click();
-        this.rowElem.dispatchEvent(new Event('change', { bubbles: true }));
+        await click(this.rowElem);
 
         const shipmentIdElem = await waitForElement<HTMLElement>(
             '.js-right-sidebar-content h2.small-title + .clearfix > strong'
@@ -87,8 +87,7 @@ export class ChitChatsShipment {
         const addPackageElem = await waitForElement<HTMLLinkElement>(
             `main#content .js-right-sidebar-content a.info-panel__edit-link`,
         );
-        addPackageElem.click();
-        addPackageElem.dispatchEvent(new Event('change', { bubbles: true }));
+        await click(addPackageElem);
 
         const settings = await getSettings();
         console.log(`ChitChats client ID: ${settings.chitChatsClientId}`);
@@ -126,8 +125,7 @@ export class ChitChatsShipment {
         // Jump to description navigation step if necessary.
         const descLink = await this.waitForNavigationSteps('description');
         if (descLink) {
-            descLink.click();
-            descLink.dispatchEvent(new Event('change', { bubbles: true }));
+            await click(descLink);
         }
 
         const settings = await getSettings();
@@ -163,7 +161,7 @@ export class ChitChatsShipment {
                     if (productMatcher.defaultPrice) {
                         if ((productMatcher.lowestPrice && oldPrice < productMatcher.lowestPrice)
                             || (productMatcher.highestPrice && oldPrice > productMatcher.highestPrice)) {
-                                return productMatcher.defaultPrice.toString();
+                            return productMatcher.defaultPrice.toString();
                         }
                     }
                     return oldValue;
@@ -230,56 +228,52 @@ export class ChitChatsShipment {
             await this.setInputValue(contactElemSel, manufacturer.contact, `Failed to set product ${i} manufacturer contact`);
 
             // Fill in manufacturer country
-            await this.setInputValue(
-                `#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_country_code`,
-                manufacturer.country,
-                `Failed to set product ${i} manufacturer country`
-            );
+            try {
+                await selectOptionByValueOrLabel(`select[id="shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_country_code"]`, manufacturer.country);
+            } catch (err) {
+                throw new Error(`Failed to select product ${i} manufacturer country: ${err}`);
+            }
 
             // Fill in manufacturer address1
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_street`, manufacturer.address1);
-            } catch (err) {
-                throw new Error(`Failed to set product ${i} manufacturer address1: ${err}`);
-            }
+            await this.setInputValue(
+                `#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_street`,
+                manufacturer.address1,
+                `Failed to set product ${i} manufacturer address1`
+            );
 
             // Fill in manufacturer address2 if needed
             if (manufacturer.address2) {
-                try {
-                    await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_street_2`, manufacturer.address2);
-                } catch (err) {
-                    throw new Error(`Failed to set product ${i} manufacturer address2: ${err}`);
-                }
+                await this.setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_street_2`,
+                    manufacturer.address2,
+                    `Failed to set product ${i} manufacturer address2`
+                );
             }
 
             // Fill in manufacturer city
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_city`, manufacturer.city);
-            } catch (err) {
-                throw new Error(`Failed to set product ${i} manufacturer city: ${err}`);
-            }
+            await this.setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_city`,
+                manufacturer.city,
+                `Failed to set product ${i} manufacturer city`
+            );
 
             // Fill in manufacturer postal code
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_postal_code`, manufacturer.postalCode);
-            } catch (err) {
-                throw new Error(`Failed to set product ${i} manufacturer postal code: ${err}`);
-            }
+            await this.setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_postal_code`,
+                manufacturer.postalCode,
+                `Failed to set product ${i} manufacturer postal code`
+            );
 
             // Fill in manufacturer phone
-            try {
-                await setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_phone`, manufacturer.phone);
-            } catch (err) {
-                throw new Error(`Failed to set product ${i} manufacturer phone: ${err}`);
-            }
+            await this.setInputValue(`#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_phone`,
+                manufacturer.phone,
+                `Failed to set product ${i} manufacturer phone`
+            );
 
             // Fill in manufacturer email
             const emailElemSel = `#shipment_customs_view_model_shipment_items_attributes_${i}_manufacturer_email`;
-            try {
-                await setInputValue(emailElemSel, manufacturer.email);
-            } catch (err) {
-                throw new Error(`Failed to set product ${i} manufacturer email: ${err}`);
-            }
+            await this.setInputValue(
+                emailElemSel,
+                manufacturer.email,
+                `Failed to set product ${i} manufacturer email`
+            );
 
             // Select province
             try {
@@ -311,8 +305,7 @@ export class ChitChatsShipment {
         const submitBtn = await waitForElement(
             `form#new_shipment_customs_view_model input[type="submit"][name="save"]`
         ) as HTMLInputElement;
-        submitBtn.click();
-        submitBtn.dispatchEvent(new Event('change', { bubbles: true }));
+        await click(submitBtn);
     }
 
     /**
@@ -376,21 +369,9 @@ export class ChitChatsShipment {
         }
 
         // Fill in package size
-        try {
-            await setInputValue('input#shipment_package_view_model_size_x_amount', pkg.length.toString());
-        } catch (err) {
-            throw new Error(`Failed to set package length: ${err}`);
-        }
-        try {
-            await setInputValue('input#shipment_package_view_model_size_y_amount', pkg.width.toString());
-        } catch (err) {
-            throw new Error(`Failed to set package width: ${err}`);
-        }
-        try {
-            await setInputValue('input#shipment_package_view_model_size_z_amount', pkg.height.toString());
-        } catch (err) {
-            throw new Error(`Failed to set package height: ${err}`);
-        }
+        await this.setInputValue('input#shipment_package_view_model_size_x_amount', pkg.length.toString(), 'Failed to set package length');
+        await this.setInputValue('input#shipment_package_view_model_size_y_amount', pkg.width.toString(), 'Failed to set package width');
+        await this.setInputValue('input#shipment_package_view_model_size_z_amount', pkg.height.toString(), 'Failed to set package height');
 
         // Scroll to the bottom
         try {
@@ -412,8 +393,7 @@ export class ChitChatsShipment {
         const submitBtn = await waitForElement<HTMLInputElement>(
             `form#new_shipment_package_view_model input[type="submit"][name="save"]`
         );
-        submitBtn.click();
-        submitBtn.dispatchEvent(new Event('change', { bubbles: true }));
+        await click(submitBtn);
     }
 
     /**
@@ -472,8 +452,7 @@ export class ChitChatsShipment {
         const submitBtn = await waitForElement<HTMLInputElement>(
             `form#new_shipment_platform_postage_view_model input[type="submit"][name="buy"]`
         );
-        submitBtn.click();
-        submitBtn.dispatchEvent(new Event('change', { bubbles: true }));
+        await click(submitBtn);
     }
 
     async downloadShippingLabel() {
@@ -508,11 +487,6 @@ export class ChitChatsShipment {
         if (!doneBtn) {
             throw new Error(`Closing shipment dialog failed`);
         }
-        const eventOptions = { bubbles: true, cancelable: true, view: window };
-        doneBtn.dispatchEvent(new MouseEvent('mousedown', eventOptions));
-        doneBtn.dispatchEvent(new MouseEvent('mouseup', eventOptions));
-        doneBtn.click();
-
-        await sleep(500);
+        await click(doneBtn);
     }
 }

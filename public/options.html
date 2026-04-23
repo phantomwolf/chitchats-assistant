@@ -147,6 +147,9 @@
       .row .field select {
         margin-bottom: 0;
       }
+      .compact-row {
+        max-width: 500px;
+      }
       .switch {
         position: relative;
         display: inline-block;
@@ -436,11 +439,14 @@
       <button id="add-postage-link" class="link-button" type="button">Add another postage</button>
 
       <div id="add-postage-form" class="hidden">
-        <label for="s-name">Name</label>
-        <input id="s-name" type="text" />
-
-        <button id="add-postage">Add Postage</button>
-        <button id="cancel-add-postage" type="button">Cancel</button>
+        <div class="row compact-row">
+          <div class="field">
+            <label for="s-name">Name</label>
+            <input id="s-name" type="text" />
+          </div>
+          <button id="add-postage">Add Postage</button>
+          <button id="cancel-add-postage" type="button">Cancel</button>
+        </div>
       </div>
     </section>
 
@@ -448,10 +454,22 @@
       <div class="section-title">General</div>
 
       <div class="edit-panel">
-        <label for="general-client-id">ChitChats client ID</label>
-        <input id="general-client-id" type="text" placeholder="e.g. 1234567" />
-        <div class="edit-actions">
+        <div class="row compact-row">
+          <div class="field">
+            <label for="general-client-id">ChitChats client ID</label>
+            <input id="general-client-id" type="text" placeholder="e.g. 1234567" />
+          </div>
           <button id="save-client-id" type="button">Save</button>
+        </div>
+      </div>
+
+      <div class="edit-panel">
+        <div class="row compact-row">
+          <div class="field">
+            <label for="general-shipment-delay">Delay between shipments (ms)</label>
+            <input id="general-shipment-delay" type="number" step="100" min="0" placeholder="e.g. 1500" />
+          </div>
+          <button id="save-shipment-delay" type="button">Save</button>
         </div>
       </div>
 

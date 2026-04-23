@@ -2,6 +2,7 @@ export {};
 
 import { ChitChatsPendingShipmentPage } from "./content/chitchats-shipment-page.js";
 import { ChitChatsShipment } from "./content/chitchats-shipment.js";
+import { getSettings } from "./utils/settings.js";
 import { sleep } from "./utils/utils.js";
 
 const CONTENT_INIT_KEY = "__chitchatsContentRunnerInitialized";
@@ -36,7 +37,8 @@ async function buyShipments(isSelected: boolean = false) {
       }
     }
 
-    await sleep(1000);
+    const settings = await getSettings();
+    await sleep(settings.shipmentDelay);
   }
 }
 

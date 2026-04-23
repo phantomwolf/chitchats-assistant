@@ -7,6 +7,7 @@ export class Settings {
     public postages: Postage[] = [];
     public isDefaultProductEnabled: boolean = true;
     public chitChatsClientId: string = '';
+    public shipmentDelay: number = 0;
 
     private constructor() { }
 
@@ -18,6 +19,7 @@ export class Settings {
             postages: [],
             isDefaultProductEnabled: true,
             chitChatsClientId: "",
+            shipmentDelay: 0,
         });
         this.manufacturers = res.manufacturers;
         this.products = res.products;
@@ -25,6 +27,7 @@ export class Settings {
         this.postages = res.postages;
         this.isDefaultProductEnabled = res.isDefaultProductEnabled;
         this.chitChatsClientId = res.chitChatsClientId;
+        this.shipmentDelay = res.shipmentDelay;
 
         // Init default product
         if (!this.products.default) {
@@ -166,6 +169,10 @@ export class Settings {
 
     public async saveChitchatsClientId() {
         await chrome.storage.sync.set({ chitChatsClientId: this.chitChatsClientId });
+    }
+
+    public async saveShipmentDelay() {
+        await chrome.storage.sync.set({ shipmentDelay: this.shipmentDelay });
     }
 
     public async createPackage(pkg: Package) {
